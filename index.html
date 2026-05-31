@@ -1,703 +1,1225 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>跑酷小游戏</title>
-  <style>
-    /* 全局重置，黑色背景居中显示画布 */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #1a1a2e;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-family: 'Segoe UI', sans-serif;
-      overflow: hidden;
-    }
-    canvas {
-      display: block;
-      border-radius: 12px;
-      box-shadow: 0 0 40px rgba(100, 180, 255, 0.3);
-    }
-    /* 提示文字 */
-    #hint {
-      margin-top: 12px;
-      color: rgba(255,255,255,0.4);
-      font-size: 13px;
-      letter-spacing: 1px;
-    }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<title>剪辑AI · 一键成片</title>
+<style>
+/* ─── Reset & Variables ─── */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0a0f;--bg2:#13131a;--bg3:#1c1c27;--card:#1e1e2e;--border:#2a2a3f;
+  --a1:#8b5cf6;--a2:#ec4899;--a3:#06b6d4;
+  --text:#f1f1f8;--sub:#8888aa;
+  --grad:linear-gradient(135deg,#8b5cf6,#ec4899);
+  --r:16px;--r2:12px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif}
+#app{position:fixed;inset:0;overflow:hidden}
+
+/* ─── Screen transitions ─── */
+.screen{
+  position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  background:var(--bg);transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;
+}
+.screen.hidden{transform:translateX(100%);opacity:0;pointer-events:none}
+.screen.back{transform:translateX(-28%);opacity:0;pointer-events:none}
+
+/* ─── Safe areas ─── */
+.safe-top{height:env(safe-area-inset-top,24px);min-height:24px}
+.safe-bot{height:env(safe-area-inset-bottom,20px);min-height:20px}
+
+/* ─── Navbar ─── */
+.navbar{
+  display:flex;align-items:center;justify-content:space-between;padding:12px 20px;
+  position:sticky;top:0;z-index:10;
+  background:rgba(10,10,15,.88);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.nav-title{font-size:17px;font-weight:700}
+.nav-back{
+  width:36px;height:36px;border-radius:50%;background:var(--bg3);
+  border:none;color:var(--text);font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.nav-action{background:none;border:none;color:var(--a1);font-size:15px;font-weight:600;cursor:pointer;padding:6px 2px}
+
+/* ─── Buttons ─── */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  border:none;border-radius:var(--r);font-size:16px;font-weight:600;
+  cursor:pointer;transition:transform .15s,opacity .15s;user-select:none;padding:14px 24px;
+}
+.btn:active{transform:scale(.96);opacity:.9}
+.btn-primary{background:var(--grad);color:#fff;width:100%}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.btn-ghost{background:transparent;color:var(--sub);border:1px solid var(--border)}
+
+/* ─── Grad text ─── */
+.grad-text{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* ─── Progress ─── */
+.progress-track{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--grad);border-radius:2px;transition:width .3s ease}
+
+/* ─── Tag ─── */
+.tag{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.tag-purple{background:rgba(139,92,246,.18);color:#c4b5fd}
+
+/* ══════════ HOME ══════════ */
+#s-home{background:var(--bg)}
+.home-hero{
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:40px 24px;
+  text-align:center;position:relative;overflow:hidden;
+}
+.home-glow{position:absolute;width:400px;height:400px;border-radius:50%;filter:blur(80px);pointer-events:none}
+.glow-1{background:rgba(139,92,246,.22);top:-100px;left:-80px}
+.glow-2{background:rgba(236,72,153,.18);bottom:-80px;right:-60px}
+.home-logo{
+  width:88px;height:88px;border-radius:24px;background:var(--grad);
+  display:flex;align-items:center;justify-content:center;font-size:44px;
+  margin-bottom:28px;box-shadow:0 0 40px rgba(139,92,246,.5);
+  animation:float 3s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.home-title{font-size:36px;font-weight:800;line-height:1.2;margin-bottom:12px}
+.home-sub{font-size:15px;color:var(--sub);line-height:1.7;margin-bottom:48px;max-width:280px}
+.home-actions{width:100%;max-width:320px;display:flex;flex-direction:column;gap:14px}
+.home-start{padding:18px;font-size:18px;box-shadow:0 8px 32px rgba(139,92,246,.4)}
+.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:48px;width:100%;max-width:340px}
+.feat-item{
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;
+  background:var(--card);border-radius:var(--r2);border:1px solid var(--border);
+}
+.feat-icon{font-size:24px}
+.feat-label{font-size:11px;color:var(--sub);text-align:center;line-height:1.4}
+
+/* ══════════ TEMPLATES ══════════ */
+#s-templates .content{padding:16px 20px 40px}
+.tmpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.tmpl-card{
+  border-radius:var(--r);overflow:hidden;cursor:pointer;
+  position:relative;aspect-ratio:9/16;transition:transform .2s;
+}
+.tmpl-card:active{transform:scale(.97)}
+.tmpl-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:52px}
+.tmpl-overlay{
+  position:absolute;inset:0;
+  background:linear-gradient(0deg,rgba(0,0,0,.7) 0%,transparent 55%);
+  display:flex;flex-direction:column;justify-content:flex-end;padding:14px;
+}
+.tmpl-name{font-size:15px;font-weight:700}
+.tmpl-desc{font-size:11px;color:rgba(255,255,255,.7);margin-top:4px}
+.tmpl-badge{
+  position:absolute;top:10px;right:10px;background:var(--grad);color:#fff;
+  font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;
+}
+.t1{background:linear-gradient(135deg,#1a1a2e,#16213e)}
+.t2{background:linear-gradient(135deg,#2d1b69,#11998e)}
+.t3{background:linear-gradient(135deg,#3d0c11,#f5576c60)}
+.t4{background:linear-gradient(135deg,#1e1b4b,#4e54c8)}
+.t5{background:linear-gradient(135deg,#1c1400,#f7971e60)}
+.t6{background:linear-gradient(135deg,#0f2027,#203a43)}
+
+/* ══════════ IMPORT ══════════ */
+#s-import .content{padding:20px;display:flex;flex-direction:column;gap:20px;min-height:calc(100vh - 70px)}
+.import-drop{
+  border:2px dashed var(--a1);border-radius:var(--r);
+  background:rgba(139,92,246,.06);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;padding:48px 24px;cursor:pointer;transition:background .2s,border-color .2s;
+}
+.import-drop.dragover{background:rgba(139,92,246,.15);border-color:var(--a2)}
+.import-drop-icon{font-size:48px}
+.import-drop-title{font-size:16px;font-weight:600}
+.import-drop-sub{font-size:13px;color:var(--sub);text-align:center;line-height:1.6}
+.import-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.import-thumb{aspect-ratio:1;border-radius:var(--r2);overflow:hidden;position:relative;background:var(--bg3)}
+.import-thumb img,.import-thumb video{width:100%;height:100%;object-fit:cover}
+.import-thumb .rm{
+  position:absolute;top:4px;right:4px;width:22px;height:22px;
+  background:rgba(0,0,0,.7);border-radius:50%;border:none;color:#fff;
+  font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.import-thumb .dur{
+  position:absolute;bottom:4px;left:4px;
+  background:rgba(0,0,0,.6);padding:2px 6px;border-radius:4px;font-size:10px;color:#fff;
+}
+.add-more{
+  aspect-ratio:1;border-radius:var(--r2);background:var(--bg3);
+  border:2px dashed var(--border);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;cursor:pointer;
+  font-size:28px;color:var(--sub);
+}
+.import-footer{margin-top:auto;display:flex;flex-direction:column;gap:12px}
+
+/* ══════════ STYLE SELECT ══════════ */
+#s-style .content{padding:20px;display:flex;flex-direction:column;gap:20px;min-height:calc(100vh - 70px)}
+.style-intro{text-align:center;padding:8px 0 4px}
+.style-intro h2{font-size:22px;font-weight:700;margin-bottom:8px}
+.style-intro p{font-size:14px;color:var(--sub);line-height:1.6}
+.style-list{display:flex;flex-direction:column;gap:12px}
+.style-item{
+  display:flex;align-items:center;gap:16px;padding:16px;
+  border-radius:var(--r);background:var(--card);border:2px solid var(--border);
+  cursor:pointer;transition:border-color .2s,background .2s;
+}
+.style-item.selected{border-color:var(--a1);background:rgba(139,92,246,.1)}
+.style-icon-wrap{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+.s1{background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(236,72,153,.3))}
+.s2{background:linear-gradient(135deg,rgba(6,182,212,.3),rgba(139,92,246,.3))}
+.s3{background:linear-gradient(135deg,rgba(251,146,60,.3),rgba(236,72,153,.3))}
+.s4{background:linear-gradient(135deg,rgba(16,185,129,.3),rgba(6,182,212,.3))}
+.s5{background:linear-gradient(135deg,rgba(245,158,11,.3),rgba(239,68,68,.3))}
+.s6{background:linear-gradient(135deg,rgba(99,102,241,.3),rgba(168,85,247,.3))}
+.style-info{flex:1;min-width:0}
+.style-name{font-size:16px;font-weight:700;margin-bottom:4px}
+.style-desc{font-size:12px;color:var(--sub);line-height:1.5}
+.style-check{
+  width:24px;height:24px;border-radius:50%;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;transition:all .2s;
+}
+.style-item.selected .style-check{background:var(--a1);border-color:var(--a1);color:#fff}
+.style-footer{margin-top:auto}
+
+/* ══════════ AI PROCESSING ══════════ */
+#s-processing{background:var(--bg)}
+.proc-wrap{
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:40px 24px;
+  text-align:center;position:relative;overflow:hidden;
+}
+.proc-glow{
+  position:absolute;width:300px;height:300px;border-radius:50%;filter:blur(60px);
+  background:rgba(139,92,246,.3);animation:pglow 2s ease-in-out infinite;
+}
+@keyframes pglow{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.1)}}
+.proc-ring{width:120px;height:120px;border-radius:50%;position:relative;margin-bottom:32px}
+.proc-ring svg{width:100%;height:100%;animation:spin 1.5s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.proc-center-icon{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px}
+.proc-title{font-size:24px;font-weight:800;margin-bottom:8px}
+.proc-step-label{font-size:14px;color:var(--sub);margin-bottom:28px;min-height:20px}
+.proc-pct-wrap{margin-bottom:32px}
+.proc-pct{font-size:40px;font-weight:800}
+.proc-pct span{font-size:22px}
+.proc-steps-list{display:flex;flex-direction:column;gap:10px;width:100%;max-width:320px;text-align:left}
+.proc-step-item{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;
+  background:var(--card);border-radius:var(--r2);border:1px solid var(--border);
+  transition:border-color .3s,background .3s;
+}
+.proc-step-item.done{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.06)}
+.proc-step-item.active{border-color:var(--a1);background:rgba(139,92,246,.08)}
+.step-dot{
+  width:10px;height:10px;border-radius:50%;background:var(--border);
+  flex-shrink:0;transition:background .3s;
+}
+.proc-step-item.done .step-dot{background:#10b981}
+.proc-step-item.active .step-dot{background:var(--a1);box-shadow:0 0 8px var(--a1);animation:blink .8s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.step-lbl{font-size:13px;font-weight:500}
+.proc-step-item.done .step-lbl{color:var(--sub)}
+.step-tick{margin-left:auto;font-size:14px;color:#10b981;opacity:0;transition:opacity .3s}
+.proc-step-item.done .step-tick{opacity:1}
+
+/* ══════════ PREVIEW / EDIT ══════════ */
+#s-preview{background:var(--bg)}
+.preview-video-wrap{
+  position:relative;width:100%;background:#000;
+  aspect-ratio:9/16;max-height:56vh;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+#preview-canvas{width:100%;height:100%;object-fit:contain}
+.preview-sub-wrap{
+  position:absolute;bottom:56px;left:0;right:0;
+  text-align:center;padding:0 20px;pointer-events:none;
+}
+.preview-subtitle{
+  display:inline-block;background:rgba(0,0,0,.7);
+  padding:6px 14px;border-radius:6px;font-size:15px;font-weight:700;color:#fff;
+  transition:opacity .4s;
+}
+.preview-controls{
+  position:absolute;bottom:10px;left:0;right:0;
+  display:flex;align-items:center;gap:10px;padding:0 14px;
+}
+.ctrl-btn{
+  width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);
+  backdrop-filter:blur(10px);border:none;color:#fff;font-size:15px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.ctrl-time-track{
+  flex:1;height:3px;background:rgba(255,255,255,.2);border-radius:2px;
+  position:relative;cursor:pointer;
+}
+.ctrl-time-fill{position:absolute;left:0;top:0;height:100%;background:#fff;border-radius:2px}
+.ctrl-time{font-size:11px;color:rgba(255,255,255,.7);white-space:nowrap}
+.edit-tabs{
+  display:flex;overflow-x:auto;gap:8px;padding:12px 20px;
+  border-bottom:1px solid var(--border);scrollbar-width:none;
+}
+.edit-tabs::-webkit-scrollbar{display:none}
+.edit-tab{
+  flex-shrink:0;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;
+  border:none;cursor:pointer;background:var(--bg3);color:var(--sub);transition:all .2s;
+}
+.edit-tab.active{background:var(--a1);color:#fff}
+.edit-panel{padding:16px 20px;display:none}
+.edit-panel.active{display:block}
+
+/* Music */
+.music-list{display:flex;flex-direction:column;gap:10px}
+.music-item{
+  display:flex;align-items:center;gap:14px;padding:12px 14px;
+  border-radius:var(--r2);background:var(--bg3);border:2px solid transparent;
+  cursor:pointer;transition:border-color .2s;
+}
+.music-item.selected{border-color:var(--a1)}
+.music-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--card);flex-shrink:0}
+.music-info{flex:1;min-width:0}
+.music-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.music-dur{font-size:11px;color:var(--sub);margin-top:2px}
+.music-play{width:32px;height:32px;border-radius:50%;background:var(--a1);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.wave{display:flex;align-items:center;gap:2px;height:22px}
+.wave-b{width:3px;border-radius:2px;background:var(--a1);animation:wa 1s ease-in-out infinite}
+.wave-b:nth-child(1){height:8px;animation-delay:.0s}
+.wave-b:nth-child(2){height:16px;animation-delay:.1s}
+.wave-b:nth-child(3){height:11px;animation-delay:.2s}
+.wave-b:nth-child(4){height:20px;animation-delay:.3s}
+.wave-b:nth-child(5){height:9px;animation-delay:.4s}
+@keyframes wa{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.35)}}
+
+/* Filters */
+.filter-row{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none}
+.filter-row::-webkit-scrollbar{display:none}
+.filter-item{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+.filter-thumb{
+  width:64px;height:64px;border-radius:12px;border:2.5px solid transparent;
+  transition:border-color .2s;overflow:hidden;
+}
+.filter-item.selected .filter-thumb{border-color:var(--a1)}
+.filter-name{font-size:11px;color:var(--sub)}
+.filter-item.selected .filter-name{color:var(--a1);font-weight:600}
+
+/* Subtitle settings */
+.sub-section{margin-bottom:20px}
+.sub-section-title{font-size:12px;color:var(--sub);margin-bottom:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.sub-toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sub-toggle-lbl{font-size:15px;font-weight:600}
+.toggle{
+  width:50px;height:28px;border-radius:14px;background:var(--bg3);
+  border:none;cursor:pointer;position:relative;transition:background .2s;
+}
+.toggle.on{background:var(--a1)}
+.toggle::after{
+  content:'';position:absolute;top:4px;left:4px;width:20px;height:20px;
+  border-radius:50%;background:#fff;transition:transform .2s;
+}
+.toggle.on::after{transform:translateX(22px)}
+.font-row{display:flex;gap:8px;flex-wrap:wrap}
+.font-btn{
+  padding:7px 14px;border-radius:8px;background:var(--bg3);
+  border:2px solid var(--border);color:var(--sub);font-size:13px;cursor:pointer;transition:all .2s;
+}
+.font-btn.selected{border-color:var(--a1);color:var(--text)}
+.color-row{display:flex;gap:10px;margin-top:8px}
+.color-dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:border-color .2s,transform .2s}
+.color-dot.selected{border-color:#fff;transform:scale(1.2)}
+.ratio-row{display:flex;gap:10px;flex-wrap:wrap}
+.ratio-btn{
+  flex:1;min-width:72px;padding:10px;border-radius:var(--r2);
+  background:var(--bg3);border:2px solid var(--border);
+  color:var(--sub);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s;
+}
+.ratio-btn.selected{border-color:var(--a1);color:var(--text);background:rgba(139,92,246,.1)}
+
+/* ══════════ EXPORT ══════════ */
+#s-export .content{padding:24px;display:flex;flex-direction:column;gap:22px;min-height:calc(100vh - 70px)}
+.export-thumb{
+  aspect-ratio:9/16;max-height:240px;border-radius:var(--r);overflow:hidden;
+  background:#111;position:relative;display:flex;align-items:center;justify-content:center;
+}
+#export-canvas{width:100%;height:100%;object-fit:contain}
+.export-badge{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;
+}
+.export-badge-icon{font-size:48px}
+.export-badge-dur{
+  background:rgba(0,0,0,.6);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;
+}
+.sec-title{font-size:12px;color:var(--sub);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.quality-row{display:flex;gap:12px}
+.quality-card{
+  flex:1;padding:14px;border-radius:var(--r2);background:var(--card);
+  border:2px solid var(--border);cursor:pointer;text-align:center;transition:all .2s;
+}
+.quality-card.selected{border-color:var(--a1);background:rgba(139,92,246,.1)}
+.quality-label{font-size:18px;font-weight:800;margin-bottom:4px}
+.quality-sub{font-size:11px;color:var(--sub)}
+.share-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.share-item{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+.share-icon{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px}
+.share-label{font-size:11px;color:var(--sub)}
+.export-progress{display:none;flex-direction:column;gap:12px;text-align:center;padding:16px 0}
+.export-progress.vis{display:flex}
+.export-done{display:none;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:16px 0}
+.export-done.vis{display:flex}
+.done-icon{font-size:64px;animation:pop .4s cubic-bezier(.175,.885,.32,1.275)}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.export-footer{margin-top:auto;display:flex;flex-direction:column;gap:12px}
+
+/* ─── Toast ─── */
+#toast{
+  position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(16px);
+  background:rgba(30,30,46,.95);border:1px solid var(--border);backdrop-filter:blur(20px);
+  padding:10px 20px;border-radius:30px;font-size:13px;
+  opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;z-index:999;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+#file-input{display:none}
+</style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
-  <div id="hint">空格键 / 点击屏幕 跳跃</div>
+<div id="app">
 
-  <script>
-    // ─────────────────────────────────────────────
-    // 画布初始化
-    // ─────────────────────────────────────────────
-    const canvas = document.getElementById('gameCanvas');
-    const ctx    = canvas.getContext('2d');
+<!-- ══════════════════════════════════
+     SCREEN 1 · HOME
+══════════════════════════════════ -->
+<div class="screen" id="s-home">
+  <div class="safe-top"></div>
+  <div class="home-hero">
+    <div class="home-glow glow-1"></div>
+    <div class="home-glow glow-2"></div>
+    <div class="home-logo">✂️</div>
+    <h1 class="home-title">剪辑<span class="grad-text">AI</span></h1>
+    <p class="home-sub">AI 驱动，一键成片<br/>零基础也能做出大片感</p>
+    <div class="home-actions">
+      <button class="btn btn-primary home-start" onclick="goTo('s-import')">
+        <span>✨</span> 开始剪辑
+      </button>
+      <button class="btn btn-secondary" onclick="goTo('s-templates')">
+        <span>🎨</span> 模板广场
+      </button>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-item"><div class="feat-icon">🤖</div><div class="feat-label">AI 智能<br/>自动剪辑</div></div>
+      <div class="feat-item"><div class="feat-icon">💬</div><div class="feat-label">自动字幕<br/>语音识别</div></div>
+      <div class="feat-item"><div class="feat-icon">🎵</div><div class="feat-label">智能配乐<br/>自动卡点</div></div>
+      <div class="feat-item"><div class="feat-icon">🎬</div><div class="feat-label">多种转场<br/>动态特效</div></div>
+      <div class="feat-item"><div class="feat-icon">📱</div><div class="feat-label">一键导出<br/>高清成片</div></div>
+      <div class="feat-item"><div class="feat-icon">🚀</div><div class="feat-label">3 秒钟<br/>极速成片</div></div>
+    </div>
+  </div>
+  <div class="safe-bot"></div>
+</div>
 
-    // 根据窗口大小自适应画布尺寸
-    function resize() {
-      const maxW = Math.min(window.innerWidth - 20, 800);
-      canvas.width  = maxW;
-      canvas.height = Math.round(maxW * 0.4);   // 宽高比 5:2
+<!-- ══════════════════════════════════
+     SCREEN 2 · TEMPLATE PLAZA
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-templates">
+  <div class="safe-top"></div>
+  <div class="navbar">
+    <button class="nav-back" onclick="goBack()">‹</button>
+    <span class="nav-title">模板广场</span>
+    <div style="width:36px"></div>
+  </div>
+  <div class="content">
+    <div style="padding:4px 0 0;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none">
+      <button class="tag tag-purple" style="flex-shrink:0;cursor:pointer">全部</button>
+      <button class="tag" style="flex-shrink:0;cursor:pointer;background:var(--bg3);color:var(--sub)">生活日常</button>
+      <button class="tag" style="flex-shrink:0;cursor:pointer;background:var(--bg3);color:var(--sub)">卡点潮玩</button>
+      <button class="tag" style="flex-shrink:0;cursor:pointer;background:var(--bg3);color:var(--sub)">探店</button>
+      <button class="tag" style="flex-shrink:0;cursor:pointer;background:var(--bg3);color:var(--sub)">口播</button>
+      <button class="tag" style="flex-shrink:0;cursor:pointer;background:var(--bg3);color:var(--sub)">旅行</button>
+    </div>
+    <div class="tmpl-grid">
+      <div class="tmpl-card t1" onclick="useTemplate('生活日常')">
+        <div class="tmpl-bg">🌸</div>
+        <div class="tmpl-overlay"><span class="tmpl-name">生活日常</span><span class="tmpl-desc">清新温暖风格</span></div>
+        <span class="tmpl-badge">热门</span>
+      </div>
+      <div class="tmpl-card t2" onclick="useTemplate('卡点潮玩')">
+        <div class="tmpl-bg">⚡</div>
+        <div class="tmpl-overlay"><span class="tmpl-name">卡点潮玩</span><span class="tmpl-desc">节奏感超强</span></div>
+        <span class="tmpl-badge">NEW</span>
+      </div>
+      <div class="tmpl-card t3" onclick="useTemplate('探店美食')">
+        <div class="tmpl-bg">🍜</div>
+        <div class="tmpl-overlay"><span class="tmpl-name">探店美食</span><span class="tmpl-desc">高级质感</span></div>
+      </div>
+      <div class="tmpl-card t4" onclick="useTemplate('口播讲解')">
+        <div class="tmpl-bg">🎙️</div>
+        <div class="tmpl-overlay"><span class="tmpl-name">口播讲解</span><span class="tmpl-desc">专业感十足</span></div>
+      </div>
+      <div class="tmpl-card t5" onclick="useTemplate('旅行Vlog')">
+        <div class="tmpl-bg">✈️</div>
+        <div class="tmpl-overlay"><span class="tmpl-name">旅行 Vlog</span><span class="tmpl-desc">大片质感</span></div>
+        <span class="tmpl-badge">热门</span>
+      </div>
+      <div class="tmpl-card t6" onclick="useTemplate('运动健身')">
+        <div class="tmpl-bg">💪</div>
+        <div class="tmpl-overlay"><span class="tmpl-name">运动健身</span><span class="tmpl-desc">活力动感</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="safe-bot"></div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN 3 · IMPORT
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-import">
+  <div class="safe-top"></div>
+  <div class="navbar">
+    <button class="nav-back" onclick="goBack()">‹</button>
+    <span class="nav-title">添加素材</span>
+    <button class="nav-action" id="import-next-btn" style="opacity:.3" onclick="proceedFromImport()">下一步</button>
+  </div>
+  <div class="content">
+    <div class="import-drop" id="import-drop"
+      onclick="triggerFileInput()"
+      ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
+      <div class="import-drop-icon">📁</div>
+      <div class="import-drop-title">点击添加视频 / 图片</div>
+      <div class="import-drop-sub">支持 MP4、MOV、JPG、PNG<br/>可多选，支持分段合并</div>
+    </div>
+    <div id="import-grid" class="import-grid" style="display:none"></div>
+    <div class="import-footer">
+      <div style="text-align:center;font-size:13px;color:var(--sub)">已选 <span id="import-count-num" style="color:var(--text);font-weight:700">0</span> 个素材</div>
+      <button class="btn btn-primary" id="import-main-btn" onclick="proceedFromImport()" style="opacity:.3;pointer-events:none">
+        <span>🤖</span> AI 智能剪辑
+      </button>
+    </div>
+  </div>
+  <div class="safe-bot"></div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN 4 · STYLE SELECT
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-style">
+  <div class="safe-top"></div>
+  <div class="navbar">
+    <button class="nav-back" onclick="goBack()">‹</button>
+    <span class="nav-title">选择风格</span>
+    <div style="width:36px"></div>
+  </div>
+  <div class="content">
+    <div class="style-intro">
+      <h2>想要什么风格？</h2>
+      <p>AI 将根据风格自动匹配转场、滤镜和背景音乐</p>
+    </div>
+    <div class="style-list">
+      <div class="style-item selected" data-style="生活日常" onclick="selectStyle(this)">
+        <div class="style-icon-wrap s1">🌸</div>
+        <div class="style-info"><div class="style-name">生活日常</div><div class="style-desc">温暖清新，适合日常记录、闺蜜出游</div></div>
+        <div class="style-check">✓</div>
+      </div>
+      <div class="style-item" data-style="卡点潮玩" onclick="selectStyle(this)">
+        <div class="style-icon-wrap s2">⚡</div>
+        <div class="style-info"><div class="style-name">卡点潮玩</div><div class="style-desc">节奏感强，自动卡点，适合年轻潮流内容</div></div>
+        <div class="style-check">✓</div>
+      </div>
+      <div class="style-item" data-style="探店美食" onclick="selectStyle(this)">
+        <div class="style-icon-wrap s3">🍜</div>
+        <div class="style-info"><div class="style-name">探店美食</div><div class="style-desc">质感高级，色彩浓郁，适合探店评测类</div></div>
+        <div class="style-check">✓</div>
+      </div>
+      <div class="style-item" data-style="口播讲解" onclick="selectStyle(this)">
+        <div class="style-icon-wrap s4">🎙️</div>
+        <div class="style-info"><div class="style-name">口播讲解</div><div class="style-desc">简洁专业，字幕突出，适合知识分享类</div></div>
+        <div class="style-check">✓</div>
+      </div>
+      <div class="style-item" data-style="旅行Vlog" onclick="selectStyle(this)">
+        <div class="style-icon-wrap s5">✈️</div>
+        <div class="style-info"><div class="style-name">旅行 Vlog</div><div class="style-desc">大片感强，色调清透，适合旅行记录</div></div>
+        <div class="style-check">✓</div>
+      </div>
+      <div class="style-item" data-style="运动健身" onclick="selectStyle(this)">
+        <div class="style-icon-wrap s6">💪</div>
+        <div class="style-info"><div class="style-name">运动健身</div><div class="style-desc">动感炫酷，快节奏，适合运动打卡内容</div></div>
+        <div class="style-check">✓</div>
+      </div>
+    </div>
+    <div class="style-footer">
+      <button class="btn btn-primary" onclick="startAIProcessing()"><span>✨</span> 开始 AI 剪辑</button>
+    </div>
+  </div>
+  <div class="safe-bot"></div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN 5 · AI PROCESSING
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-processing">
+  <div class="proc-wrap">
+    <div class="proc-glow"></div>
+    <div class="proc-ring">
+      <svg viewBox="0 0 100 100" fill="none">
+        <circle cx="50" cy="50" r="44" stroke="rgba(139,92,246,.2)" stroke-width="6"/>
+        <circle cx="50" cy="50" r="44" stroke="url(#pg)" stroke-width="6"
+          stroke-linecap="round" stroke-dasharray="276" stroke-dashoffset="200"/>
+        <defs>
+          <linearGradient id="pg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#8b5cf6"/>
+            <stop offset="100%" stop-color="#ec4899"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="proc-center-icon">🤖</div>
+    </div>
+    <div class="proc-title">AI 正在创作中<span id="proc-dots"></span></div>
+    <div class="proc-step-label" id="proc-step-lbl">正在初始化...</div>
+    <div class="proc-pct-wrap" style="width:100%;max-width:300px">
+      <div class="progress-track" style="margin-bottom:8px">
+        <div class="progress-fill" id="proc-bar" style="width:0%"></div>
+      </div>
+      <div style="text-align:right">
+        <span class="proc-pct"><span id="proc-pct">0</span><span>%</span></span>
+      </div>
+    </div>
+    <div class="proc-steps-list" id="proc-steps-list">
+      <div class="proc-step-item" data-idx="0"><div class="step-dot"></div><div class="step-lbl">解析视频素材</div><div class="step-tick">✓</div></div>
+      <div class="proc-step-item" data-idx="1"><div class="step-dot"></div><div class="step-lbl">AI 画面内容识别</div><div class="step-tick">✓</div></div>
+      <div class="proc-step-item" data-idx="2"><div class="step-dot"></div><div class="step-lbl">智能卡点剪辑</div><div class="step-tick">✓</div></div>
+      <div class="proc-step-item" data-idx="3"><div class="step-dot"></div><div class="step-lbl">语音识别生成字幕</div><div class="step-tick">✓</div></div>
+      <div class="proc-step-item" data-idx="4"><div class="step-dot"></div><div class="step-lbl">匹配背景音乐节奏</div><div class="step-tick">✓</div></div>
+      <div class="proc-step-item" data-idx="5"><div class="step-dot"></div><div class="step-lbl">添加转场与特效</div><div class="step-tick">✓</div></div>
+      <div class="proc-step-item" data-idx="6"><div class="step-dot"></div><div class="step-lbl">合成输出成片</div><div class="step-tick">✓</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN 6 · PREVIEW / EDIT
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-preview">
+  <div class="safe-top"></div>
+  <div class="navbar">
+    <button class="nav-back" onclick="goBack()">‹</button>
+    <span class="nav-title">预览编辑</span>
+    <button class="nav-action" onclick="goTo('s-export')">导出 →</button>
+  </div>
+  <div class="preview-video-wrap">
+    <canvas id="preview-canvas" width="540" height="960"></canvas>
+    <div class="preview-sub-wrap">
+      <span class="preview-subtitle" id="preview-sub">欢迎使用 AI 剪辑</span>
+    </div>
+    <div class="preview-controls">
+      <button class="ctrl-btn" id="play-btn" onclick="togglePlay()">▶</button>
+      <div class="ctrl-time-track" onclick="seekVideo(event)">
+        <div class="ctrl-time-fill" id="time-fill" style="width:0%"></div>
+      </div>
+      <span class="ctrl-time" id="time-label">0:00 / 0:30</span>
+    </div>
+  </div>
+  <div class="edit-tabs">
+    <button class="edit-tab active" onclick="switchTab('music',this)">🎵 音乐</button>
+    <button class="edit-tab" onclick="switchTab('filter',this)">🎨 滤镜</button>
+    <button class="edit-tab" onclick="switchTab('subtitle',this)">💬 字幕</button>
+    <button class="edit-tab" onclick="switchTab('ratio',this)">📐 画幅</button>
+  </div>
+
+  <!-- Music Panel -->
+  <div class="edit-panel active" id="panel-music">
+    <div class="music-list">
+      <div class="music-item selected" data-music="0" onclick="selectMusic(this)">
+        <div class="music-icon">🎹</div>
+        <div class="music-info"><div class="music-name">AI 推荐 · 浪漫轻快</div><div class="music-dur">2:34 · 已自动匹配节奏</div></div>
+        <div class="wave"><div class="wave-b"></div><div class="wave-b"></div><div class="wave-b"></div><div class="wave-b"></div><div class="wave-b"></div></div>
+      </div>
+      <div class="music-item" data-music="1" onclick="selectMusic(this)">
+        <div class="music-icon">🎸</div>
+        <div class="music-info"><div class="music-name">活力节拍 · 电子流行</div><div class="music-dur">3:12</div></div>
+        <button class="music-play">▶</button>
+      </div>
+      <div class="music-item" data-music="2" onclick="selectMusic(this)">
+        <div class="music-icon">🎻</div>
+        <div class="music-info"><div class="music-name">温柔时光 · 轻音乐</div><div class="music-dur">2:58</div></div>
+        <button class="music-play">▶</button>
+      </div>
+      <div class="music-item" data-music="3" onclick="selectMusic(this)">
+        <div class="music-icon">🥁</div>
+        <div class="music-info"><div class="music-name">嘻哈卡点 · Hip-Hop</div><div class="music-dur">1:48</div></div>
+        <button class="music-play">▶</button>
+      </div>
+      <div class="music-item" data-music="4" onclick="selectMusic(this)">
+        <div class="music-icon">🎷</div>
+        <div class="music-info"><div class="music-name">爵士咖啡 · 探店专属</div><div class="music-dur">3:05</div></div>
+        <button class="music-play">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Panel -->
+  <div class="edit-panel" id="panel-filter">
+    <div class="filter-row" id="filter-row"></div>
+  </div>
+
+  <!-- Subtitle Panel -->
+  <div class="edit-panel" id="panel-subtitle">
+    <div class="sub-section">
+      <div class="sub-toggle-row">
+        <span class="sub-toggle-lbl">显示字幕</span>
+        <button class="toggle on" id="sub-toggle" onclick="toggleSubtitle(this)"></button>
+      </div>
+    </div>
+    <div class="sub-section">
+      <div class="sub-section-title">字体样式</div>
+      <div class="font-row">
+        <button class="font-btn selected" onclick="selectFont(this,'bold')">粗体</button>
+        <button class="font-btn" onclick="selectFont(this,'normal')">常规</button>
+        <button class="font-btn" onclick="selectFont(this,'outline')">描边</button>
+        <button class="font-btn" onclick="selectFont(this,'shadow')">阴影</button>
+      </div>
+    </div>
+    <div class="sub-section">
+      <div class="sub-section-title">字幕颜色</div>
+      <div class="color-row">
+        <div class="color-dot selected" style="background:#fff" onclick="selectSubColor(this,'#fff')"></div>
+        <div class="color-dot" style="background:#fbbf24" onclick="selectSubColor(this,'#fbbf24')"></div>
+        <div class="color-dot" style="background:#f87171" onclick="selectSubColor(this,'#f87171')"></div>
+        <div class="color-dot" style="background:#34d399" onclick="selectSubColor(this,'#34d399')"></div>
+        <div class="color-dot" style="background:#60a5fa" onclick="selectSubColor(this,'#60a5fa')"></div>
+        <div class="color-dot" style="background:#c084fc" onclick="selectSubColor(this,'#c084fc')"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ratio Panel -->
+  <div class="edit-panel" id="panel-ratio">
+    <div style="margin-bottom:16px">
+      <div class="sub-section-title">视频分辨率</div>
+      <div class="ratio-row">
+        <button class="ratio-btn" onclick="selectRatioBtn(this)">720P<br/><span style="font-size:10px;font-weight:400;color:var(--sub)">1280×720</span></button>
+        <button class="ratio-btn selected" onclick="selectRatioBtn(this)">1080P<br/><span style="font-size:10px;font-weight:400;color:var(--sub)">1920×1080</span></button>
+        <button class="ratio-btn" onclick="selectRatioBtn(this)">4K<br/><span style="font-size:10px;font-weight:400;color:var(--sub)">3840×2160</span></button>
+      </div>
+    </div>
+    <div>
+      <div class="sub-section-title">帧率</div>
+      <div class="ratio-row">
+        <button class="ratio-btn" onclick="selectRatioBtn(this)">24fps</button>
+        <button class="ratio-btn selected" onclick="selectRatioBtn(this)">30fps</button>
+        <button class="ratio-btn" onclick="selectRatioBtn(this)">60fps</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:24px"></div>
+  <div class="safe-bot"></div>
+</div>
+
+<!-- ══════════════════════════════════
+     SCREEN 7 · EXPORT
+══════════════════════════════════ -->
+<div class="screen hidden" id="s-export">
+  <div class="safe-top"></div>
+  <div class="navbar">
+    <button class="nav-back" onclick="goBack()">‹</button>
+    <span class="nav-title">导出成片</span>
+    <div style="width:36px"></div>
+  </div>
+  <div class="content">
+    <div class="export-thumb">
+      <canvas id="export-canvas" width="270" height="480" style="width:100%;height:100%;object-fit:contain"></canvas>
+      <div class="export-badge">
+        <div class="export-badge-icon">🎬</div>
+        <div class="export-badge-dur">00:30 · 竖屏 9:16</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-title">导出清晰度</div>
+      <div class="quality-row">
+        <div class="quality-card" data-q="720P" onclick="selectQuality(this)">
+          <div class="quality-label">720P</div><div class="quality-sub">流畅 · 小文件</div>
+        </div>
+        <div class="quality-card selected" data-q="1080P" onclick="selectQuality(this)">
+          <div class="quality-label">1080P</div><div class="quality-sub">高清 · 推荐</div>
+        </div>
+        <div class="quality-card" data-q="4K" onclick="selectQuality(this)">
+          <div class="quality-label">4K</div><div class="quality-sub">超清 · 大文件</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="export-progress" id="export-progress">
+      <div style="font-size:16px;font-weight:700">正在导出...</div>
+      <div class="progress-track"><div class="progress-fill" id="export-bar" style="width:0%"></div></div>
+      <div id="export-pct" style="font-size:14px;color:var(--sub)">0%</div>
+    </div>
+
+    <div class="export-done" id="export-done">
+      <div class="done-icon">✅</div>
+      <div style="font-size:20px;font-weight:800">导出成功！</div>
+      <div style="font-size:14px;color:var(--sub)">视频已保存到相册</div>
+      <button class="btn btn-primary" style="margin-top:8px;max-width:220px" onclick="resetAndHome()">继续创作</button>
+    </div>
+
+    <div>
+      <div class="sec-title">分享到</div>
+      <div class="share-grid">
+        <div class="share-item" onclick="shareToApp('抖音')">
+          <div class="share-icon" style="background:#111">🎵</div><span class="share-label">抖音</span>
+        </div>
+        <div class="share-item" onclick="shareToApp('快手')">
+          <div class="share-icon" style="background:linear-gradient(135deg,#ff4e50,#f9d423)">🎬</div><span class="share-label">快手</span>
+        </div>
+        <div class="share-item" onclick="shareToApp('微信')">
+          <div class="share-icon" style="background:#07c160">💬</div><span class="share-label">微信</span>
+        </div>
+        <div class="share-item" onclick="shareToApp('微博')">
+          <div class="share-icon" style="background:linear-gradient(135deg,#e6162d,#ff8200)">🌟</div><span class="share-label">微博</span>
+        </div>
+        <div class="share-item" onclick="shareToApp('小红书')">
+          <div class="share-icon" style="background:#fe2c55">📕</div><span class="share-label">小红书</span>
+        </div>
+        <div class="share-item" onclick="shareToApp('B站')">
+          <div class="share-icon" style="background:#00a1d6">📺</div><span class="share-label">B站</span>
+        </div>
+        <div class="share-item" onclick="shareSystem()">
+          <div class="share-icon" style="background:var(--bg3)">📤</div><span class="share-label">更多</span>
+        </div>
+        <div class="share-item" onclick="showToast('视频已保存到相册')">
+          <div class="share-icon" style="background:var(--bg3)">💾</div><span class="share-label">保存相册</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="export-footer">
+      <button class="btn btn-primary" id="export-btn" onclick="startExport()"><span>⬇️</span> 导出到相册</button>
+      <button class="btn btn-ghost" onclick="goBack()">返回继续编辑</button>
+    </div>
+  </div>
+  <div class="safe-bot"></div>
+</div>
+
+</div><!-- #app -->
+
+<input type="file" id="file-input" accept="video/*,image/*" multiple onchange="handleFiles(event)"/>
+<div id="toast"></div>
+
+<script>
+/* ────────────────────────────── STATE ────────────────────────────── */
+const S = {
+  history: ['s-home'],
+  media: [],
+  style: '生活日常',
+  music: 0,
+  filter: 'original',
+  quality: '1080P',
+  subVisible: true,
+  subColor: '#fff',
+  subFont: 'bold',
+  playing: false,
+  progress: 0,
+  totalDur: 30,
+  rafId: null,
+  lastT: 0,
+};
+
+/* ────────────────────────────── ROUTER ────────────────────────────── */
+function goTo(id) {
+  const cur = S.history[S.history.length - 1];
+  if (cur === id) return;
+  document.getElementById(cur).classList.add('back');
+  const next = document.getElementById(id);
+  next.classList.remove('hidden', 'back');
+  S.history.push(id);
+  next.scrollTop = 0;
+}
+function goBack() {
+  if (S.history.length < 2) return;
+  const cur = S.history.pop();
+  const prev = S.history[S.history.length - 1];
+  document.getElementById(cur).classList.add('hidden');
+  document.getElementById(cur).classList.remove('back');
+  document.getElementById(prev).classList.remove('back', 'hidden');
+}
+
+/* ────────────────────────────── FILE IMPORT ────────────────────────────── */
+function triggerFileInput() { document.getElementById('file-input').click(); }
+
+function handleFiles(e) {
+  addMediaFiles(Array.from(e.target.files));
+  e.target.value = '';
+}
+function onDragOver(e) { e.preventDefault(); document.getElementById('import-drop').classList.add('dragover'); }
+function onDragLeave() { document.getElementById('import-drop').classList.remove('dragover'); }
+function onDrop(e) {
+  e.preventDefault(); onDragLeave();
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('video/') || f.type.startsWith('image/'));
+  addMediaFiles(files);
+}
+
+function addMediaFiles(files) {
+  files.forEach(f => {
+    const url = URL.createObjectURL(f);
+    const isVid = f.type.startsWith('video/');
+    const item = { type: isVid ? 'video' : 'image', url, name: f.name, dur: isVid ? 0 : 3 };
+    if (isVid) {
+      const v = document.createElement('video');
+      v.src = url;
+      v.onloadedmetadata = () => { item.dur = Math.round(v.duration); renderGrid(); };
     }
-    resize();
-    window.addEventListener('resize', () => { resize(); resetLayout(); });
+    S.media.push(item);
+  });
+  renderGrid();
+  updateImportCTA();
+}
 
-    // ─────────────────────────────────────────────
-    // 全局常量（随画布尺寸动态计算）
-    // ─────────────────────────────────────────────
-    const W = () => canvas.width;
-    const H = () => canvas.height;
-
-    // 地面 Y 坐标（距底部 18%）
-    const GROUND_Y = () => Math.round(H() * 0.82);
-
-    // ─────────────────────────────────────────────
-    // 游戏状态枚举
-    // ─────────────────────────────────────────────
-    const STATE = { READY: 0, RUNNING: 1, DEAD: 2 };
-
-    // ─────────────────────────────────────────────
-    // 背景层：多层视差滚动
-    // ─────────────────────────────────────────────
-    const bgLayers = [
-      // 远景山丘（速度最慢）
-      { speed: 0.3, color: '#2d3561', y: 0.45, amp: 0.12, offset: 0 },
-      // 中景山丘
-      { speed: 0.7, color: '#3a4a80', y: 0.58, amp: 0.09, offset: 200 },
-      // 近景山丘
-      { speed: 1.4, color: '#4a5fa0', y: 0.68, amp: 0.06, offset: 500 },
-    ];
-
-    // 星星（静止，只是装饰）
-    const stars = Array.from({ length: 60 }, () => ({
-      x: Math.random(),   // 用比例存储，画时乘以 W()
-      y: Math.random() * 0.4,
-      r: Math.random() * 1.5 + 0.3,
-      alpha: Math.random() * 0.6 + 0.3,
-    }));
-
-    // 绘制视差背景
-    function drawBackground(dt) {
-      // 天空渐变
-      const sky = ctx.createLinearGradient(0, 0, 0, H());
-      sky.addColorStop(0,   '#0d0d2b');
-      sky.addColorStop(0.7, '#1a1a4e');
-      sky.addColorStop(1,   '#2a2a6e');
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, W(), H());
-
-      // 星星
-      stars.forEach(s => {
-        ctx.globalAlpha = s.alpha;
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(s.x * W(), s.y * H(), s.r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.globalAlpha = 1;
-
-      // 月亮
-      ctx.fillStyle = '#fffde7';
-      ctx.beginPath();
-      ctx.arc(W() * 0.88, H() * 0.12, H() * 0.06, 0, Math.PI * 2);
-      ctx.fill();
-      // 月牙遮罩
-      ctx.fillStyle = '#0d0d2b';
-      ctx.beginPath();
-      ctx.arc(W() * 0.9, H() * 0.1, H() * 0.055, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 各视差层山丘
-      bgLayers.forEach(layer => {
-        if (game.state === STATE.RUNNING) {
-          layer.offset += layer.speed * game.speed * dt;
-        }
-        drawHill(layer);
-      });
+function renderGrid() {
+  const grid = document.getElementById('import-grid');
+  const drop = document.getElementById('import-drop');
+  if (!S.media.length) { grid.style.display = 'none'; drop.style.display = 'flex'; return; }
+  drop.style.display = 'none';
+  grid.style.display = 'grid';
+  grid.innerHTML = '';
+  S.media.forEach((item, i) => {
+    const d = document.createElement('div');
+    d.className = 'import-thumb';
+    if (item.type === 'video') {
+      d.innerHTML = `<video src="${item.url}" muted playsinline preload="metadata"></video>
+        <span class="dur">${fmt(item.dur)}</span>
+        <button class="rm" onclick="removeMedia(${i},event)">✕</button>`;
+    } else {
+      d.innerHTML = `<img src="${item.url}" loading="lazy"/>
+        <button class="rm" onclick="removeMedia(${i},event)">✕</button>`;
     }
+    grid.appendChild(d);
+  });
+  const addBtn = document.createElement('div');
+  addBtn.className = 'add-more';
+  addBtn.innerHTML = '<span>+</span>';
+  addBtn.onclick = triggerFileInput;
+  grid.appendChild(addBtn);
+  document.getElementById('import-count-num').textContent = S.media.length;
+}
 
-    // 绘制单个山丘层（用正弦波模拟山形）
-    function drawHill(layer) {
-      const groundY = GROUND_Y();
-      ctx.fillStyle = layer.color;
-      ctx.beginPath();
-      ctx.moveTo(0, H());
-      for (let x = 0; x <= W(); x += 4) {
-        const y = groundY * layer.y
-                  + Math.sin((x + layer.offset) * 0.008) * H() * layer.amp
-                  + Math.cos((x + layer.offset) * 0.005) * H() * layer.amp * 0.5;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(W(), H());
-      ctx.closePath();
-      ctx.fill();
+function removeMedia(i, e) {
+  e.stopPropagation();
+  S.media.splice(i, 1);
+  renderGrid();
+  updateImportCTA();
+}
+
+function updateImportCTA() {
+  const has = S.media.length > 0;
+  const mb = document.getElementById('import-main-btn');
+  const nb = document.getElementById('import-next-btn');
+  mb.style.opacity = has ? '1' : '.3';
+  mb.style.pointerEvents = has ? 'auto' : 'none';
+  nb.style.opacity = has ? '1' : '.3';
+}
+
+function proceedFromImport() {
+  if (!S.media.length) { showToast('请先添加视频或图片素材'); return; }
+  goTo('s-style');
+}
+
+function fmt(s) { s = s || 0; return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
+
+/* ────────────────────────────── STYLE ────────────────────────────── */
+function selectStyle(el) {
+  document.querySelectorAll('.style-item').forEach(x => x.classList.remove('selected'));
+  el.classList.add('selected');
+  S.style = el.dataset.style;
+}
+
+/* ────────────────────────────── AI PROCESSING ────────────────────────────── */
+const STEPS = [
+  {lbl:'解析视频素材',dur:800},
+  {lbl:'AI 画面内容识别',dur:1200},
+  {lbl:'智能卡点剪辑',dur:1500},
+  {lbl:'语音识别生成字幕',dur:1000},
+  {lbl:'匹配背景音乐节奏',dur:800},
+  {lbl:'添加转场与特效',dur:900},
+  {lbl:'合成输出成片',dur:600},
+];
+
+function startAIProcessing() {
+  goTo('s-processing');
+  runAI();
+}
+
+async function runAI() {
+  const bar = document.getElementById('proc-bar');
+  const pct = document.getElementById('proc-pct');
+  const lbl = document.getElementById('proc-step-lbl');
+  const items = document.querySelectorAll('.proc-step-item');
+  const dots = document.getElementById('proc-dots');
+  let dc = 0;
+  const di = setInterval(() => { dc = (dc+1)%4; dots.textContent = '.'.repeat(dc); }, 400);
+  const total = STEPS.reduce((a,s) => a+s.dur, 0);
+  let elapsed = 0;
+  for (let i = 0; i < STEPS.length; i++) {
+    items[i].classList.add('active');
+    lbl.textContent = STEPS[i].lbl;
+    const frames = 20;
+    for (let f = 0; f <= frames; f++) {
+      await wait(STEPS[i].dur / frames);
+      const p = Math.round(((elapsed + STEPS[i].dur*f/frames) / total) * 100);
+      bar.style.width = p + '%';
+      pct.textContent = p;
     }
+    elapsed += STEPS[i].dur;
+    items[i].classList.remove('active');
+    items[i].classList.add('done');
+    await wait(80);
+  }
+  clearInterval(di);
+  dots.textContent = '';
+  bar.style.width = '100%'; pct.textContent = '100';
+  lbl.textContent = '🎉 剪辑完成！';
+  await wait(700);
+  initPreview();
+  goTo('s-preview');
+}
 
-    // ─────────────────────────────────────────────
-    // 地面绘制
-    // ─────────────────────────────────────────────
-    let groundOffset = 0;   // 地面纹理滚动偏移
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-    function drawGround() {
-      const gy = GROUND_Y();
+/* ────────────────────────────── PREVIEW CANVAS ────────────────────────────── */
+const SUBS = ['欢迎使用 AI 剪辑','一键完成专业剪辑','自动匹配背景音乐','智能字幕已生成','多种风格随心切换','导出高清成片'];
+const PALETTES = [['#8b5cf6','#ec4899'],['#06b6d4','#8b5cf6'],['#f97316','#ec4899'],['#10b981','#06b6d4'],['#f59e0b','#ef4444'],['#6366f1','#a855f7']];
 
-      // 地面主体
-      const grad = ctx.createLinearGradient(0, gy, 0, H());
-      grad.addColorStop(0, '#3d7a3d');
-      grad.addColorStop(0.1, '#2d5a2d');
-      grad.addColorStop(1, '#1a3a1a');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, gy, W(), H() - gy);
+function initPreview() {
+  S.playing = false; S.progress = 0;
+  const c = document.getElementById('preview-canvas');
+  drawFrame(c.getContext('2d'), 0);
+  document.getElementById('play-btn').textContent = '▶';
+  document.getElementById('time-fill').style.width = '0%';
+  document.getElementById('time-label').textContent = '0:00 / 0:30';
+  buildFilters();
+  // Mirror to export canvas
+  const ec = document.getElementById('export-canvas');
+  drawFrame(ec.getContext('2d'), 0);
+}
 
-      // 地面顶部高光线
-      ctx.strokeStyle = '#5aaa5a';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, gy);
-      ctx.lineTo(W(), gy);
-      ctx.stroke();
+function drawFrame(ctx, t) {
+  const w = ctx.canvas.width, h = ctx.canvas.height;
+  const pi = Math.floor(t / 5) % PALETTES.length;
+  const [c1,c2] = PALETTES[pi];
+  const g = ctx.createLinearGradient(0,0,w,h);
+  g.addColorStop(0,c1); g.addColorStop(1,c2);
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+  ctx.beginPath(); ctx.arc(w*.8,h*.2,w*.22+Math.sin(t*.5)*10,0,Math.PI*2);
+  ctx.fillStyle='rgba(255,255,255,.07)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(w*.15,h*.72,w*.15+Math.cos(t*.7)*8,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,0,0,.09)'; ctx.fill();
+  ctx.textAlign='center';
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  ctx.font=`bold ${Math.round(w*.065)}px -apple-system,sans-serif`;
+  ctx.fillText('AI 剪辑', w/2, h/2 - w*.04);
+  ctx.fillStyle='rgba(255,255,255,.6)';
+  ctx.font=`${Math.round(w*.037)}px -apple-system,sans-serif`;
+  ctx.fillText(S.style + ' 风格', w/2, h/2 + w*.04);
+  const bg = ctx.createLinearGradient(0,h-h*.2,0,h);
+  bg.addColorStop(0,'transparent'); bg.addColorStop(1,'rgba(0,0,0,.5)');
+  ctx.fillStyle=bg; ctx.fillRect(0,h-h*.2,w,h*.2);
+}
 
-      // 滚动的地面虚线纹理（营造速度感）
-      if (game.state === STATE.RUNNING) {
-        groundOffset = (groundOffset + game.speed * 3) % 60;
-      }
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([20, 40]);
-      ctx.lineDashOffset = -groundOffset;
-      ctx.beginPath();
-      ctx.moveTo(0, gy + 8);
-      ctx.lineTo(W(), gy + 8);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
+function togglePlay() {
+  S.playing = !S.playing;
+  document.getElementById('play-btn').textContent = S.playing ? '⏸' : '▶';
+  if (S.playing) {
+    S.lastT = performance.now();
+    requestAnimationFrame(animLoop);
+  }
+}
 
-    // ─────────────────────────────────────────────
-    // 玩家角色
-    // ─────────────────────────────────────────────
-    const player = {
-      x: 0, y: 0,           // 实际坐标（每帧计算）
-      w: 0, h: 0,           // 宽高
-      vy: 0,                // 竖直速度
-      onGround: false,
-      jumpCount: 0,         // 已跳次数（支持二段跳）
-      maxJumps: 2,
+function animLoop(now) {
+  if (!S.playing) return;
+  const dt = (now - S.lastT) / 1000; S.lastT = now;
+  S.progress = Math.min(S.progress + dt, S.totalDur);
+  const pct = S.progress / S.totalDur;
+  document.getElementById('time-fill').style.width = (pct*100) + '%';
+  document.getElementById('time-label').textContent = fmt(Math.floor(S.progress)) + ' / ' + fmt(S.totalDur);
+  const c = document.getElementById('preview-canvas');
+  drawFrame(c.getContext('2d'), S.progress);
+  if (S.subVisible) {
+    const si = Math.floor(pct * SUBS.length) % SUBS.length;
+    const sub = document.getElementById('preview-sub');
+    sub.textContent = SUBS[si];
+    sub.style.color = S.subColor;
+    sub.style.opacity = '1';
+    if (S.subFont === 'bold') { sub.style.fontWeight='700'; sub.style.textShadow='none'; }
+    else if (S.subFont === 'outline') { sub.style.fontWeight='700'; sub.style.textShadow='0 0 3px #000,0 0 3px #000'; }
+    else if (S.subFont === 'shadow') { sub.style.fontWeight='600'; sub.style.textShadow='2px 2px 4px rgba(0,0,0,.8)'; }
+    else { sub.style.fontWeight='400'; sub.style.textShadow='none'; }
+  }
+  if (S.progress >= S.totalDur) { S.playing=false; S.progress=0; document.getElementById('play-btn').textContent='▶'; return; }
+  requestAnimationFrame(animLoop);
+}
 
-      // 动画帧
-      frame: 0,
-      frameTimer: 0,
-      frameDuration: 0.1,   // 每帧持续秒数
+function seekVideo(e) {
+  const r = e.currentTarget.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+  S.progress = pct * S.totalDur;
+  document.getElementById('time-fill').style.width = (pct*100) + '%';
+  document.getElementById('time-label').textContent = fmt(Math.floor(S.progress)) + ' / ' + fmt(S.totalDur);
+  drawFrame(document.getElementById('preview-canvas').getContext('2d'), S.progress);
+}
 
-      // 根据画布大小重置位置和尺寸
-      reset() {
-        this.w = H() * 0.13;
-        this.h = H() * 0.18;
-        this.x = W() * 0.15;
-        this.y = GROUND_Y() - this.h;
-        this.vy = 0;
-        this.onGround = true;
-        this.jumpCount = 0;
-        this.frame = 0;
-        this.frameTimer = 0;
-      },
+/* ────────────────────────────── FILTERS ────────────────────────────── */
+const FILTERS = [
+  {id:'original',name:'原片',css:'none'},
+  {id:'vivid',name:'鲜艳',css:'saturate(1.8) contrast(1.1)'},
+  {id:'warm',name:'暖调',css:'sepia(.3) saturate(1.4) brightness(1.05)'},
+  {id:'cool',name:'冷调',css:'hue-rotate(30deg) saturate(1.2) brightness(.95)'},
+  {id:'film',name:'胶片',css:'contrast(1.15) brightness(.9) sepia(.15)'},
+  {id:'dark',name:'暗调',css:'brightness(.8) contrast(1.3)'},
+  {id:'fade',name:'褪色',css:'brightness(1.1) saturate(.7) contrast(.9)'},
+  {id:'pink',name:'粉调',css:'hue-rotate(320deg) saturate(1.5) brightness(1.05)'},
+];
+const FG_COLORS = [['#c084fc','#818cf8'],['#f472b6','#fb923c'],['#34d399','#06b6d4'],['#fbbf24','#f87171'],['#a78bfa','#c084fc'],['#64748b','#475569'],['#6ee7b7','#a7f3d0'],['#fda4af','#fecdd3']];
 
-      jump() {
-        if (this.jumpCount < this.maxJumps) {
-          // 跳跃力度（负值向上）
-          this.vy = -H() * 0.022;
-          this.jumpCount++;
-          this.onGround = false;
-          spawnJumpParticles(this.x + this.w / 2, this.y + this.h);
-        }
-      },
-
-      update(dt) {
-        // 重力
-        this.vy += H() * 0.045 * dt;
-        this.y  += this.vy * 60 * dt;
-
-        const groundY = GROUND_Y() - this.h;
-        if (this.y >= groundY) {
-          this.y = groundY;
-          this.vy = 0;
-          this.onGround = true;
-          this.jumpCount = 0;
-        }
-
-        // 跑步帧动画计时
-        if (this.onGround) {
-          this.frameTimer += dt;
-          if (this.frameTimer >= this.frameDuration) {
-            this.frameTimer = 0;
-            this.frame = (this.frame + 1) % 4;
-          }
-        }
-      },
-
-      draw() {
-        const x = this.x, y = this.y, w = this.w, h = this.h;
-
-        // 腿部动画（在地面时摆动）
-        const legSwing = this.onGround ? Math.sin(this.frame * Math.PI / 2) * w * 0.2 : 0;
-
-        // 后腿
-        ctx.fillStyle = '#1565c0';
-        ctx.beginPath();
-        ctx.roundRect(x + w * 0.3 - legSwing, y + h * 0.6, w * 0.22, h * 0.4, 4);
-        ctx.fill();
-
-        // 前腿
-        ctx.fillStyle = '#1976d2';
-        ctx.beginPath();
-        ctx.roundRect(x + w * 0.5 + legSwing, y + h * 0.6, w * 0.22, h * 0.4, 4);
-        ctx.fill();
-
-        // 鞋子
-        ctx.fillStyle = '#fff176';
-        [[x + w * 0.28 - legSwing, y + h * 0.93], [x + w * 0.48 + legSwing, y + h * 0.93]].forEach(([sx, sy]) => {
-          ctx.beginPath();
-          ctx.roundRect(sx, sy, w * 0.28, h * 0.1, 3);
-          ctx.fill();
-        });
-
-        // 躯干
-        const bodyGrad = ctx.createLinearGradient(x, y + h * 0.2, x + w, y + h * 0.6);
-        bodyGrad.addColorStop(0, '#ef5350');
-        bodyGrad.addColorStop(1, '#b71c1c');
-        ctx.fillStyle = bodyGrad;
-        ctx.beginPath();
-        ctx.roundRect(x + w * 0.1, y + h * 0.25, w * 0.8, h * 0.38, 6);
-        ctx.fill();
-
-        // 手臂（摆动方向与腿相反）
-        ctx.fillStyle = '#ffcc80';
-        ctx.beginPath();
-        ctx.roundRect(x - w * 0.05 + legSwing * 0.5, y + h * 0.28, w * 0.18, h * 0.28, 4);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.roundRect(x + w * 0.87 - legSwing * 0.5, y + h * 0.28, w * 0.18, h * 0.28, 4);
-        ctx.fill();
-
-        // 头
-        ctx.fillStyle = '#ffcc80';
-        ctx.beginPath();
-        ctx.arc(x + w * 0.5, y + h * 0.15, w * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 头盔
-        ctx.fillStyle = '#e53935';
-        ctx.beginPath();
-        ctx.ellipse(x + w * 0.5, y + h * 0.07, w * 0.32, h * 0.1, 0, Math.PI, 0);
-        ctx.fill();
-
-        // 眼睛
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(x + w * 0.62, y + h * 0.13, w * 0.09, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#333';
-        ctx.beginPath();
-        ctx.arc(x + w * 0.64, y + h * 0.13, w * 0.045, 0, Math.PI * 2);
-        ctx.fill();
-      },
-
-      // 碰撞盒（比视觉稍小，更宽松）
-      getBox() {
-        return {
-          x: this.x + this.w * 0.2,
-          y: this.y + this.h * 0.1,
-          w: this.w * 0.6,
-          h: this.h * 0.85,
-        };
-      },
+function buildFilters() {
+  const row = document.getElementById('filter-row');
+  row.innerHTML = '';
+  FILTERS.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'filter-item' + (f.id === S.filter ? ' selected' : '');
+    const [ca, cb] = FG_COLORS[i % FG_COLORS.length];
+    item.innerHTML = `
+      <div class="filter-thumb">
+        <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+          <defs><linearGradient id="f${i}" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="${ca}"/><stop offset="100%" stop-color="${cb}"/>
+          </linearGradient></defs>
+          <rect width="64" height="64" fill="url(#f${i})" style="filter:${f.css}"/>
+          <circle cx="22" cy="28" r="10" fill="rgba(255,255,255,.3)"/>
+          <rect x="30" y="36" width="24" height="3" rx="1.5" fill="rgba(255,255,255,.4)"/>
+        </svg>
+      </div>
+      <span class="filter-name">${f.name}</span>`;
+    item.onclick = () => {
+      document.querySelectorAll('.filter-item').forEach(x => x.classList.remove('selected'));
+      item.classList.add('selected');
+      S.filter = f.id;
+      document.getElementById('preview-canvas').style.filter = f.css === 'none' ? '' : f.css;
+      showToast('已切换「' + f.name + '」滤镜');
     };
+    row.appendChild(item);
+  });
+}
 
-    // ─────────────────────────────────────────────
-    // 障碍物
-    // ─────────────────────────────────────────────
-    const obstacles = [];
+/* ────────────────────────────── EDIT PANEL LOGIC ────────────────────────────── */
+function switchTab(id, btn) {
+  document.querySelectorAll('.edit-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.edit-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-' + id).classList.add('active');
+}
+function selectMusic(el) {
+  document.querySelectorAll('.music-item').forEach(x => x.classList.remove('selected'));
+  el.classList.add('selected');
+  S.music = parseInt(el.dataset.music);
+  showToast('已切换背景音乐');
+}
+function toggleSubtitle(btn) {
+  btn.classList.toggle('on');
+  S.subVisible = btn.classList.contains('on');
+  document.getElementById('preview-sub').style.opacity = S.subVisible ? '1' : '0';
+  showToast(S.subVisible ? '字幕已显示' : '字幕已隐藏');
+}
+function selectFont(btn, font) {
+  document.querySelectorAll('.font-btn').forEach(x => x.classList.remove('selected'));
+  btn.classList.add('selected');
+  S.subFont = font;
+}
+function selectSubColor(dot, color) {
+  document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('selected'));
+  dot.classList.add('selected');
+  S.subColor = color;
+  document.getElementById('preview-sub').style.color = color;
+}
+function selectRatioBtn(btn) {
+  const par = btn.parentElement;
+  par.querySelectorAll('.ratio-btn').forEach(x => x.classList.remove('selected'));
+  btn.classList.add('selected');
+  showToast('已设置 ' + btn.textContent.replace(/\n.*/,'').trim());
+}
 
-    // 障碍物类型定义
-    const OBS_TYPES = [
-      // 矮石块
-      { wRatio: 0.06, hRatio: 0.12, color: '#78909c', top: '#b0bec5', label: 'rock' },
-      // 中石块
-      { wRatio: 0.05, hRatio: 0.20, color: '#607d8b', top: '#90a4ae', label: 'rock2' },
-      // 仙人掌
-      { wRatio: 0.04, hRatio: 0.22, color: '#388e3c', top: '#66bb6a', label: 'cactus' },
-      // 宽矮障碍
-      { wRatio: 0.09, hRatio: 0.10, color: '#8d6e63', top: '#bcaaa4', label: 'log' },
-    ];
+/* ────────────────────────────── EXPORT ────────────────────────────── */
+function selectQuality(card) {
+  document.querySelectorAll('.quality-card').forEach(x => x.classList.remove('selected'));
+  card.classList.add('selected');
+  S.quality = card.dataset.q;
+}
 
-    function spawnObstacle() {
-      const type = OBS_TYPES[Math.floor(Math.random() * OBS_TYPES.length)];
-      const ow = W() * type.wRatio;
-      const oh = H() * type.hRatio;
-      obstacles.push({
-        x: W() + ow,
-        y: GROUND_Y() - oh,
-        w: ow,
-        h: oh,
-        color: type.color,
-        top:   type.top,
-        label: type.label,
-      });
-    }
+async function startExport() {
+  document.getElementById('export-btn').style.display = 'none';
+  const prog = document.getElementById('export-progress');
+  prog.classList.add('vis');
+  const bar = document.getElementById('export-bar');
+  const pct = document.getElementById('export-pct');
+  for (let i = 0; i <= 100; i += 2) {
+    await wait(55);
+    bar.style.width = i + '%';
+    pct.textContent = i + '%';
+  }
+  prog.classList.remove('vis');
+  document.getElementById('export-done').classList.add('vis');
+  showToast('🎉 视频已保存到相册');
+}
 
-    function updateObstacles(dt) {
-      // 随机生成间隔（基于分数递减，越跑越密）
-      game.obsTimer += dt;
-      const interval = Math.max(0.9, 2.2 - game.score * 0.0005);
-      if (game.obsTimer >= interval) {
-        game.obsTimer = 0;
-        spawnObstacle();
-        // 分数高时偶尔连续生成
-        if (game.score > 500 && Math.random() < 0.3) {
-          setTimeout(spawnObstacle, 300);
-        }
-      }
+function resetAndHome() {
+  // Reset export state
+  document.getElementById('export-btn').style.display = '';
+  document.getElementById('export-progress').classList.remove('vis');
+  document.getElementById('export-done').classList.remove('vis');
+  document.getElementById('export-bar').style.width = '0%';
+  document.getElementById('export-pct').textContent = '0%';
+  // Reset processing steps
+  document.querySelectorAll('.proc-step-item').forEach(x => { x.classList.remove('done','active'); });
+  document.getElementById('proc-bar').style.width = '0%';
+  document.getElementById('proc-pct').textContent = '0';
+  // Clear media
+  S.media = [];
+  renderGrid();
+  updateImportCTA();
+  // Navigate home
+  S.history = ['s-home'];
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('back');
+    s.classList.toggle('hidden', s.id !== 's-home');
+  });
+}
 
-      // 移动并清理出屏障碍物
-      for (let i = obstacles.length - 1; i >= 0; i--) {
-        obstacles[i].x -= game.speed * W() * dt;
-        if (obstacles[i].x + obstacles[i].w < 0) {
-          obstacles.splice(i, 1);
-        }
-      }
-    }
+function shareToApp(name) { showToast('即将跳转到 ' + name); }
+function shareSystem() {
+  if (navigator.share) {
+    navigator.share({title:'我用 AI 剪辑做的视频',text:'一键成片，超简单！'}).catch(()=>{});
+  } else { showToast('已复制分享链接'); }
+}
 
-    function drawObstacles() {
-      obstacles.forEach(o => {
-        if (o.label === 'cactus') {
-          drawCactus(o);
-        } else {
-          drawBlock(o);
-        }
-      });
-    }
+/* ────────────────────────────── TEMPLATE SHORTCUT ────────────────────────────── */
+function useTemplate(name) {
+  S.style = name;
+  // Pre-select in style screen
+  document.querySelectorAll('.style-item').forEach(x => {
+    x.classList.toggle('selected', x.dataset.style === name);
+  });
+  goTo('s-import');
+  showToast('已选择「' + name + '」模板');
+}
 
-    function drawBlock(o) {
-      // 主体
-      ctx.fillStyle = o.color;
-      ctx.beginPath();
-      ctx.roundRect(o.x, o.y, o.w, o.h, 3);
-      ctx.fill();
-      // 顶面高光
-      ctx.fillStyle = o.top;
-      ctx.beginPath();
-      ctx.roundRect(o.x, o.y, o.w, o.h * 0.15, 3);
-      ctx.fill();
-      // 阴影线
-      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(o.x, o.y, o.w, o.h);
-    }
-
-    function drawCactus(o) {
-      const x = o.x, y = o.y, w = o.w, h = o.h;
-      ctx.fillStyle = o.color;
-      // 主干
-      ctx.beginPath();
-      ctx.roundRect(x + w * 0.3, y, w * 0.4, h, 3);
-      ctx.fill();
-      // 左臂
-      ctx.beginPath();
-      ctx.roundRect(x, y + h * 0.25, w * 0.35, h * 0.15, 3);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.roundRect(x, y + h * 0.1, w * 0.15, h * 0.3, 3);
-      ctx.fill();
-      // 右臂
-      ctx.beginPath();
-      ctx.roundRect(x + w * 0.65, y + h * 0.3, w * 0.35, h * 0.15, 3);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.roundRect(x + w * 0.85, y + h * 0.15, w * 0.15, h * 0.3, 3);
-      ctx.fill();
-      // 顶部高光点
-      ctx.fillStyle = o.top;
-      ctx.beginPath();
-      ctx.arc(x + w * 0.5, y, w * 0.12, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // ─────────────────────────────────────────────
-    // 粒子系统（跳跃时的尘埃效果）
-    // ─────────────────────────────────────────────
-    const particles = [];
-
-    function spawnJumpParticles(px, py) {
-      for (let i = 0; i < 8; i++) {
-        particles.push({
-          x: px + (Math.random() - 0.5) * 20,
-          y: py,
-          vx: (Math.random() - 0.5) * 3,
-          vy: -(Math.random() * 2 + 1),
-          life: 1,
-          size: Math.random() * 4 + 2,
-        });
-      }
-    }
-
-    function updateParticles(dt) {
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.15;
-        p.life -= dt * 2;
-        if (p.life <= 0) particles.splice(i, 1);
-      }
-    }
-
-    function drawParticles() {
-      particles.forEach(p => {
-        ctx.globalAlpha = p.life * 0.6;
-        ctx.fillStyle = '#c8a96e';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.globalAlpha = 1;
-    }
-
-    // ─────────────────────────────────────────────
-    // 碰撞检测（AABB 矩形碰撞）
-    // ─────────────────────────────────────────────
-    function checkCollision() {
-      const pb = player.getBox();
-      for (const o of obstacles) {
-        if (
-          pb.x < o.x + o.w &&
-          pb.x + pb.w > o.x &&
-          pb.y < o.y + o.h &&
-          pb.y + pb.h > o.y
-        ) {
-          return true;
-        }
-      }
-      return false;
-    }
-
-    // ─────────────────────────────────────────────
-    // HUD：分数 / 最高分显示
-    // ─────────────────────────────────────────────
-    function drawHUD() {
-      const fontSize = Math.round(H() * 0.07);
-      ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
-      ctx.textBaseline = 'top';
-
-      // 当前分数（居中）
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${Math.floor(game.score)}`, W() * 0.5 + 2, H() * 0.04 + 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${Math.floor(game.score)}`, W() * 0.5, H() * 0.04);
-
-      // 最高分（右上角）
-      const smallFont = Math.round(H() * 0.045);
-      ctx.font = `${smallFont}px 'Segoe UI', sans-serif`;
-      ctx.textAlign = 'right';
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.fillText(`最高 ${Math.floor(game.best)}`, W() * 0.97, H() * 0.04);
-
-      // 当前速度倍率（左上角）
-      ctx.textAlign = 'left';
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.fillText(`x${game.speed.toFixed(1)}`, W() * 0.03, H() * 0.04);
-    }
-
-    // ─────────────────────────────────────────────
-    // 开始界面
-    // ─────────────────────────────────────────────
-    function drawReady() {
-      ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillRect(0, 0, W(), H());
-
-      const cx = W() / 2, cy = H() / 2;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      // 标题
-      ctx.font = `bold ${Math.round(H() * 0.13)}px 'Segoe UI', sans-serif`;
-      ctx.fillStyle = '#fff176';
-      ctx.fillText('跑酷！', cx, cy - H() * 0.18);
-
-      // 副标题
-      ctx.font = `${Math.round(H() * 0.06)}px 'Segoe UI', sans-serif`;
-      ctx.fillStyle = '#e0e0e0';
-      ctx.fillText('支持二段跳 · 躲避障碍物', cx, cy - H() * 0.03);
-
-      drawButton(cx, cy + H() * 0.15, '开始游戏');
-    }
-
-    // ─────────────────────────────────────────────
-    // 死亡界面
-    // ─────────────────────────────────────────────
-    function drawDead() {
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      ctx.fillRect(0, 0, W(), H());
-
-      const cx = W() / 2, cy = H() / 2;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      // 游戏结束标题
-      ctx.font = `bold ${Math.round(H() * 0.11)}px 'Segoe UI', sans-serif`;
-      ctx.fillStyle = '#ef9a9a';
-      ctx.fillText('游戏结束', cx, cy - H() * 0.22);
-
-      // 最终得分
-      ctx.font = `bold ${Math.round(H() * 0.09)}px 'Segoe UI', sans-serif`;
-      ctx.fillStyle = '#fff176';
-      ctx.fillText(`得分  ${Math.floor(game.score)}`, cx, cy - H() * 0.06);
-
-      // 最高分 / 新纪录提示
-      const isNew = game.score >= game.best;
-      ctx.font = `${Math.round(H() * 0.055)}px 'Segoe UI', sans-serif`;
-      ctx.fillStyle = isNew ? '#69f0ae' : 'rgba(255,255,255,0.6)';
-      ctx.fillText(isNew ? '🎉 新纪录！' : `最高分  ${Math.floor(game.best)}`, cx, cy + H() * 0.06);
-
-      drawButton(cx, cy + H() * 0.22, '再来一局');
-    }
-
-    // 通用圆角按钮绘制
-    function drawButton(cx, cy, text) {
-      const bw = W() * 0.28, bh = H() * 0.14;
-      const bx = cx - bw / 2, by = cy - bh / 2;
-
-      // 按钮渐变背景
-      const btnGrad = ctx.createLinearGradient(bx, by, bx, by + bh);
-      btnGrad.addColorStop(0, '#42a5f5');
-      btnGrad.addColorStop(1, '#1565c0');
-      ctx.fillStyle = btnGrad;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, bw, bh, bh / 2);
-      ctx.fill();
-
-      // 顶部高光
-      ctx.fillStyle = 'rgba(255,255,255,0.18)';
-      ctx.beginPath();
-      ctx.roundRect(bx + 2, by + 2, bw - 4, bh * 0.4, bh / 2);
-      ctx.fill();
-
-      // 文字
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.round(H() * 0.065)}px 'Segoe UI', sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(text, cx, cy);
-    }
-
-    // ─────────────────────────────────────────────
-    // 游戏核心对象
-    // ─────────────────────────────────────────────
-    const game = {
-      state: STATE.READY,
-      score: 0,
-      best:  0,
-      speed: 0.12,          // 初始移动速度（画布宽度比例/秒）
-      obsTimer: 0,          // 障碍物生成计时器
-      lastTime: 0,          // 上一帧时间戳
-
-      start() {
-        this.state    = STATE.RUNNING;
-        this.score    = 0;
-        this.speed    = 0.12;
-        this.obsTimer = 0;
-        obstacles.length  = 0;
-        particles.length  = 0;
-        player.reset();
-      },
-
-      over() {
-        this.state = STATE.DEAD;
-        this.best  = Math.max(this.best, this.score);
-        spawnJumpParticles(player.x + player.w / 2, player.y + player.h);
-      },
-    };
-
-    // ─────────────────────────────────────────────
-    // 主循环（requestAnimationFrame 驱动）
-    // ─────────────────────────────────────────────
-    function loop(timestamp) {
-      // 帧间隔（秒），限制最大值防止切回标签页时跳帧
-      const dt = Math.min((timestamp - game.lastTime) / 1000, 0.05);
-      game.lastTime = timestamp;
-
-      if (game.state === STATE.RUNNING) {
-        // 速度缓慢提升，上限 0.32
-        game.speed = Math.min(0.32, game.speed + 0.000012);
-        // 分数与速度正相关
-        game.score += game.speed * 60 * dt * 1.5;
-
-        player.update(dt);
-        updateObstacles(dt);
-        updateParticles(dt);
-
-        if (checkCollision()) game.over();
-      }
-
-      // 绘制顺序：背景 → 地面 → 障碍物 → 粒子 → 玩家 → HUD → 界面遮罩
-      drawBackground(dt);
-      drawGround();
-      drawObstacles();
-      drawParticles();
-      player.draw();
-      drawHUD();
-
-      if (game.state === STATE.READY) drawReady();
-      if (game.state === STATE.DEAD)  drawDead();
-
-      requestAnimationFrame(loop);
-    }
-
-    // ─────────────────────────────────────────────
-    // 输入处理（键盘 + 鼠标/触摸）
-    // ─────────────────────────────────────────────
-    function handleAction() {
-      if (game.state === STATE.READY || game.state === STATE.DEAD) {
-        game.start();
-      } else if (game.state === STATE.RUNNING) {
-        player.jump();
-      }
-    }
-
-    document.addEventListener('keydown', e => {
-      if (e.code === 'Space') { e.preventDefault(); handleAction(); }
-    });
-
-    canvas.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      handleAction();
-    });
-
-    // ─────────────────────────────────────────────
-    // 窗口缩放后更新布局（不中断游戏）
-    // ─────────────────────────────────────────────
-    function resetLayout() {
-      if (game.state !== STATE.RUNNING) return;
-      player.reset();
-      obstacles.forEach(o => { o.y = GROUND_Y() - o.h; });
-    }
-
-    // ─────────────────────────────────────────────
-    // 启动
-    // ─────────────────────────────────────────────
-    player.reset();
-    requestAnimationFrame(ts => {
-      game.lastTime = ts;
-      requestAnimationFrame(loop);
-    });
-  </script>
+/* ────────────────────────────── TOAST ────────────────────────────── */
+let toastTid;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTid);
+  toastTid = setTimeout(() => el.classList.remove('show'), 2200);
+}
+</script>
 </body>
 </html>
